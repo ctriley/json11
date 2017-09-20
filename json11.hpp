@@ -54,10 +54,12 @@
 #include <vector>
 #include <map>
 #include <memory>
+#include <ostream>
+#include <sstream>
 #include <initializer_list>
 
 #ifdef _MSC_VER
-    #if _MSC_VER <= 1800 // VS 2013
+#if _MSC_VER <= 1800 // VS 2013
         #ifndef noexcept
             #define noexcept throw()
         #endif
@@ -70,45 +72,45 @@
 
 namespace json11 {
 
-enum JsonParse {
+  enum JsonParse {
     STANDARD, COMMENTS
-};
+  };
 
-class JsonValue;
+  class JsonValue;
 
-struct ObjectId {
+  struct ObjectId {
     ObjectId(): _id("") { }
     ObjectId(const std::string& id): _id(id) { }
     ObjectId(const ObjectId& object_id): _id(object_id._id) { }
     // Simple move constructor
     ObjectId(ObjectId&& object_id) :
-        _id(std::move(object_id._id)) { }
+      _id(std::move(object_id._id)) { }
     // Simple move assignment operator
     ObjectId& operator=(ObjectId&& object_id) {
-         _id = std::move(object_id._id);
-         return *this;
+      _id = std::move(object_id._id);
+      return *this;
     }
     bool operator==(const ObjectId& obj) const {
-        return _id == obj._id;
+      return _id == obj._id;
     }
 
     bool operator<(const ObjectId& obj) const {
-        return _id < obj._id;
+      return _id < obj._id;
     }
 
     const std::string& getId() const {
-        return _id;
+      return _id;
     }
 
-    private:
-        std::string _id;
-};
+  private:
+    std::string _id;
+  };
 
-class Json final {
-public:
+  class Json final {
+  public:
     // Types
     enum Type {
-        NUL, NUMBER, BOOL, STRING, OBJECTID, ARRAY, OBJECT
+      NUL, NUMBER, BOOL, STRING, OBJECTID, ARRAY, OBJECT
     };
 
     // Array and object typedefs
@@ -123,7 +125,7 @@ public:
     Json(bool value);               // BOOL
     Json(const std::string &value); // STRING
     Json(std::string &&value);      // STRING
-    Json(const char * value);       // 
+    Json(const char * value);       //
     Json(const ObjectId& objectid); // OBJECTID
     Json(ObjectId&& objectid);      // OBJECTID
     Json(const array &values);      // ARRAY
@@ -137,15 +139,15 @@ public:
 
     // Implicit constructor: map-like objects (std::map, std::unordered_map, etc)
     template <class M, typename std::enable_if<
-        std::is_constructible<std::string, decltype(std::declval<M>().begin()->first)>::value
-        && std::is_constructible<Json, decltype(std::declval<M>().begin()->second)>::value,
-            int>::type = 0>
+      std::is_constructible<std::string, decltype(std::declval<M>().begin()->first)>::value
+      && std::is_constructible<Json, decltype(std::declval<M>().begin()->second)>::value,
+      int>::type = 0>
     Json(const M & m) : Json(object(m.begin(), m.end())) {}
 
     // Implicit constructor: vector-like objects (std::list, std::vector, std::set, etc)
     template <class V, typename std::enable_if<
-        std::is_constructible<Json, decltype(*std::declval<V>().begin())>::value,
-            int>::type = 0>
+      std::is_constructible<Json, decltype(*std::declval<V>().begin())>::value,
+      int>::type = 0>
     Json(const V & v) : Json(array(v.begin(), v.end())) {}
 
     // This prevents Json(some_pointer) from accidentally producing a bool. Use
@@ -185,40 +187,44 @@ public:
     const Json & operator[](const std::string &key) const;
 
     // Serialize.
-    void dump(std::string &out) const;
+    void dump(const std::string &break_line, std::ostream &out) const;
     std::string dump() const {
-        std::string out;
-        dump(out);
-        return out;
+      std::stringstream out;
+      const std::string tab = "\n";
+      dump(tab, out);
+      return out.str();
     }
+    std::ostream& dump(std::ostream& os) const;
+    std::string compact_dump() const;
+
 
     // Parse. If parse fails, return Json() and assign an error message to err.
     static Json parse(const std::string & in,
-                      std::string & err,
-                      JsonParse strategy = JsonParse::STANDARD);
+      std::string & err,
+      JsonParse strategy = JsonParse::STANDARD);
     static Json parse(const char * in,
-                      std::string & err,
-                      JsonParse strategy = JsonParse::STANDARD) {
-        if (in) {
-            return parse(std::string(in), err, strategy);
-        } else {
-            err = "null input";
-            return nullptr;
-        }
+      std::string & err,
+      JsonParse strategy = JsonParse::STANDARD) {
+      if (in) {
+        return parse(std::string(in), err, strategy);
+      } else {
+        err = "null input";
+        return nullptr;
+      }
     }
     // Parse multiple objects, concatenated or separated by whitespace
     static std::vector<Json> parse_multi(
-        const std::string & in,
-        std::string::size_type & parser_stop_pos,
-        std::string & err,
-        JsonParse strategy = JsonParse::STANDARD);
+      const std::string & in,
+      std::string::size_type & parser_stop_pos,
+      std::string & err,
+      JsonParse strategy = JsonParse::STANDARD);
 
     static inline std::vector<Json> parse_multi(
-        const std::string & in,
-        std::string & err,
-        JsonParse strategy = JsonParse::STANDARD) {
-        std::string::size_type parser_stop_pos;
-        return parse_multi(in, parser_stop_pos, err, strategy);
+      const std::string & in,
+      std::string & err,
+      JsonParse strategy = JsonParse::STANDARD) {
+      std::string::size_type parser_stop_pos;
+      return parse_multi(in, parser_stop_pos, err, strategy);
     }
 
     bool operator== (const Json &rhs) const;
@@ -236,20 +242,24 @@ public:
     typedef std::initializer_list<std::pair<std::string, Type>> shape;
     bool has_shape(const shape & types, std::string & err) const;
 
-private:
+    static std::string default_tab;
+  private:
     std::shared_ptr<JsonValue> m_ptr;
-};
+  };
 
-// Internal class hierarchy - JsonValue objects are not exposed to users of this API.
-class JsonValue {
-protected:
+  std::ostream& operator<<(std::ostream &os, const Json& json);
+
+
+  // Internal class hierarchy - JsonValue objects are not exposed to users of this API.
+  class JsonValue {
+  protected:
     friend class Json;
     friend class JsonInt;
     friend class JsonDouble;
     virtual Json::Type type() const = 0;
     virtual bool equals(const JsonValue * other) const = 0;
     virtual bool less(const JsonValue * other) const = 0;
-    virtual void dump(std::string &out) const = 0;
+    virtual void dump(const std::string &tab, std::ostream &out) const = 0;
     virtual double number_value() const;
     virtual int int_value() const;
     virtual bool bool_value() const;
@@ -260,6 +270,6 @@ protected:
     virtual const Json::object &object_items() const;
     virtual const Json &operator[](const std::string &key) const;
     virtual ~JsonValue() {}
-};
+  };
 
 } // namespace json11
