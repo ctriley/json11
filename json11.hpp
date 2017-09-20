@@ -76,11 +76,39 @@ enum JsonParse {
 
 class JsonValue;
 
+struct ObjectId {
+    ObjectId(): _id("") { }
+    ObjectId(const std::string& id): _id(id) { }
+    ObjectId(const ObjectId& object_id): _id(object_id._id) { }
+    // Simple move constructor
+    ObjectId(ObjectId&& object_id) :
+        _id(std::move(object_id._id)) { }
+    // Simple move assignment operator
+    ObjectId& operator=(ObjectId&& object_id) {
+         _id = std::move(object_id._id);
+         return *this;
+    }
+    bool operator==(const ObjectId& obj) const {
+        return _id == obj._id;
+    }
+
+    bool operator<(const ObjectId& obj) const {
+        return _id < obj._id;
+    }
+
+    const std::string& getId() const {
+        return _id;
+    }
+
+    private:
+        std::string _id;
+};
+
 class Json final {
 public:
     // Types
     enum Type {
-        NUL, NUMBER, BOOL, STRING, ARRAY, OBJECT
+        NUL, NUMBER, BOOL, STRING, OBJECTID, ARRAY, OBJECT
     };
 
     // Array and object typedefs
@@ -95,7 +123,9 @@ public:
     Json(bool value);               // BOOL
     Json(const std::string &value); // STRING
     Json(std::string &&value);      // STRING
-    Json(const char * value);       // STRING
+    Json(const char * value);       // 
+    Json(const ObjectId& objectid); // OBJECTID
+    Json(ObjectId&& objectid);      // OBJECTID
     Json(const array &values);      // ARRAY
     Json(array &&values);           // ARRAY
     Json(const object &values);     // OBJECT
@@ -129,6 +159,7 @@ public:
     bool is_number() const { return type() == NUMBER; }
     bool is_bool()   const { return type() == BOOL; }
     bool is_string() const { return type() == STRING; }
+    bool is_objectid() const { return type() == OBJECTID; }
     bool is_array()  const { return type() == ARRAY; }
     bool is_object() const { return type() == OBJECT; }
 
@@ -143,6 +174,7 @@ public:
     // Return the enclosed string if this is a string, "" otherwise.
     const std::string &string_value() const;
     // Return the enclosed std::vector if this is an array, or an empty vector otherwise.
+    const ObjectId &objectid_value() const;
     const array &array_items() const;
     // Return the enclosed std::map if this is an object, or an empty map otherwise.
     const object &object_items() const;
@@ -222,6 +254,7 @@ protected:
     virtual int int_value() const;
     virtual bool bool_value() const;
     virtual const std::string &string_value() const;
+    virtual const ObjectId &objectid_value() const;
     virtual const Json::array &array_items() const;
     virtual const Json &operator[](size_t i) const;
     virtual const Json::object &object_items() const;

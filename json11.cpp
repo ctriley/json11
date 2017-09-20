@@ -102,6 +102,10 @@ static void dump(const string &value, string &out) {
     out += '"';
 }
 
+static void dump(const ObjectId &object_id, const string &break_line, std::ostream &out) {
+    out << "ObjectId('" << object_id.getId() << "')";
+}
+
 static void dump(const Json::array &values, string &out) {
     bool first = true;
     out += "[";
@@ -192,6 +196,13 @@ public:
     explicit JsonString(string &&value)      : Value(move(value)) {}
 };
 
+class JsonObjectId final : public Value<Json::OBJECTID, ObjectId> {
+    const ObjectId &objectid_value() const override { return m_value; }
+public:
+    explicit JsonObjectId(const ObjectId &value) : Value(value) {}
+    explicit JsonObjectId(ObjectId &&value) : Value(move(value)) {}
+};
+
 class JsonArray final : public Value<Json::ARRAY, Json::array> {
     const Json::array &array_items() const override { return m_value; }
     const Json & operator[](size_t i) const override;
@@ -221,6 +232,7 @@ struct Statics {
     const std::shared_ptr<JsonValue> t = make_shared<JsonBoolean>(true);
     const std::shared_ptr<JsonValue> f = make_shared<JsonBoolean>(false);
     const string empty_string;
+    const ObjectId empty_objectid;
     const vector<Json> empty_vector;
     const map<string, Json> empty_map;
     Statics() {}
@@ -249,6 +261,8 @@ Json::Json(bool value)                 : m_ptr(value ? statics().t : statics().f
 Json::Json(const string &value)        : m_ptr(make_shared<JsonString>(value)) {}
 Json::Json(string &&value)             : m_ptr(make_shared<JsonString>(move(value))) {}
 Json::Json(const char * value)         : m_ptr(make_shared<JsonString>(value)) {}
+Json::Json(const ObjectId& value)      : m_ptr(make_shared<JsonObjectId>(value)) {}
+Json::Json(ObjectId&& value)           : m_ptr(make_shared<JsonObjectId>(move(value))) {}
 Json::Json(const Json::array &values)  : m_ptr(make_shared<JsonArray>(values)) {}
 Json::Json(Json::array &&values)       : m_ptr(make_shared<JsonArray>(move(values))) {}
 Json::Json(const Json::object &values) : m_ptr(make_shared<JsonObject>(values)) {}
@@ -263,6 +277,7 @@ double Json::number_value()                       const { return m_ptr->number_v
 int Json::int_value()                             const { return m_ptr->int_value();    }
 bool Json::bool_value()                           const { return m_ptr->bool_value();   }
 const string & Json::string_value()               const { return m_ptr->string_value(); }
+const ObjectId & Json::objectid_value()           const { return m_ptr->objectid_value(); }
 const vector<Json> & Json::array_items()          const { return m_ptr->array_items();  }
 const map<string, Json> & Json::object_items()    const { return m_ptr->object_items(); }
 const Json & Json::operator[] (size_t i)          const { return (*m_ptr)[i];           }
@@ -272,6 +287,7 @@ double                    JsonValue::number_value()              const { return 
 int                       JsonValue::int_value()                 const { return 0; }
 bool                      JsonValue::bool_value()                const { return false; }
 const string &            JsonValue::string_value()              const { return statics().empty_string; }
+const ObjectId &          JsonValue::objectid_value()            const { return statics().empty_objectid; }
 const vector<Json> &      JsonValue::array_items()               const { return statics().empty_vector; }
 const map<string, Json> & JsonValue::object_items()              const { return statics().empty_map; }
 const Json &              JsonValue::operator[] (size_t)         const { return static_null(); }
@@ -557,7 +573,30 @@ struct JsonParser final {
             }
         }
     }
-
+    Json parse_objectid() {
+        if(str.size()<i+9) {
+            string esc = str.substr(i, str.size()-i);
+            i = str.size();
+            return fail("Not long enough for an ObjectId:"+esc,"");
+        }
+        string id = str.substr(i-1, 10);
+        if ( id == "ObjectId('")
+            i += 9;
+        else
+            return fail("cannot match ObjectId(':"+id, "");
+        if(str.size()<i+25)
+            return fail("Not long enough for an ObjectId (should be of length 24):"+str.substr(i, str.size()-i),"");
+        id = str.substr(i, 24);
+        i += 24;
+        if (!std::regex_match (id, std::regex("^([a-f\\d]{24})") ))
+            return fail("Not an ObjectId:"+id,"");
+        string end = str.substr(i, 2);
+        i += 2;
+        if(end == "')")
+            return ObjectId(id);
+        return fail("Too long enough for an ObjectId (should be of length 24):"+id+end,"");
+    }
+    
     /* parse_number()
      *
      * Parse a double.
@@ -658,7 +697,8 @@ struct JsonParser final {
 
         if (ch == '"')
             return parse_string();
-
+        if (ch == 'O')
+            return parse_objectid();
         if (ch == '{') {
             map<string, Json> data;
             ch = get_next_token();
