@@ -147,7 +147,7 @@ namespace json11 {
       if (!first)
         out << ", " + new_break_line;
       dump(kv.first, new_break_line, out);
-      out << ": " + new_break_line;
+      out << ": ";
       kv.second.dump(new_break_line, out);
       first = false;
     }
