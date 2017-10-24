@@ -128,30 +128,32 @@ namespace json11 {
     std::ostream &out) {
     bool first = true;
     string new_break_line = break_line+Json::default_tab;
-    out << "[" + new_break_line;
+    out << "[";
     for (const auto &value : values) {
-      if (!first)
-        out << ", " + new_break_line;
+      if (first) out << new_break_line;
+      else out << ", " << new_break_line;
       value.dump(new_break_line, out);
       first = false;
     }
-    out << break_line + "]";
+    if (!values.empty()) out << break_line;
+    out << "]";
   }
 
   static void dump(const Json::object &values, const string &break_line,
     std::ostream &out) {
     bool first = true;
     string new_break_line = break_line + Json::default_tab;
-    out << "{" + new_break_line;
+    out << "{";
     for (const auto &kv : values) {
-      if (!first)
-        out << ", " + new_break_line;
+      if (first) out << new_break_line;
+      else out << ", " << new_break_line;
       dump(kv.first, new_break_line, out);
       out << ": ";
       kv.second.dump(new_break_line, out);
       first = false;
     }
-    out << break_line + "}";
+    if (!values.empty()) out << break_line;
+    out << "}";
   }
 
   //void Json::dump(const string &break_line, std::ostream &out) {
