@@ -76,6 +76,12 @@ namespace json11 {
     STANDARD, COMMENTS
   };
 
+  struct JsonParserException: public std::runtime_error {
+    JsonParserException(): std::runtime_error("") {}
+    JsonParserException(std::string err): std::runtime_error(err) {}
+    JsonParserException(const char* err): std::runtime_error(err) {}
+  };
+
   class JsonValue;
 
   struct ObjectId {
